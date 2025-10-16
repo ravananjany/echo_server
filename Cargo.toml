@@ -1,0 +1,8 @@
+[package]
+name = "echo_server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+futures = { version = "0.3.31", features = ["thread-pool"] }
+echo-server = "3.0.0"
