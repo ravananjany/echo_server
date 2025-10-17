@@ -1,16 +1,16 @@
 mod command;
-pub mod mem_store;
 mod server;
+pub mod mem_store;
 
+use crate::command::Command;
+pub use mem_store::Mem;
 use std::collections::HashMap;
 use std::io::{BufReader, Write};
 use std::net::TcpStream;
 use std::ops::{Add, Mul};
+use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Condvar, Mutex, RwLock};
 use std::{sync::mpsc, thread};
-
-use crate::command::Command;
-use std::sync::mpsc::Receiver;
 
 pub struct Counter {
     count: u64,
@@ -35,6 +35,7 @@ pub struct ThreadPool {
     counter: Arc<Mutex<u64>>,
     cc: Arc<Mutex<Counter>>,
     mem: Arc<RwLock<HashMap<String, String>>>,
+    in_memory: Arc<Mem>,
 }
 
 impl ThreadPool {
@@ -42,6 +43,7 @@ impl ThreadPool {
         size: usize,
         cc: Arc<Mutex<Counter>>,
         mem: Arc<RwLock<HashMap<String, String>>>,
+        in_memory: Arc<Mem>,
     ) -> ThreadPool {
         let (sender, rec) = mpsc::channel();
 
@@ -55,25 +57,30 @@ impl ThreadPool {
 
         let counter = Arc::new(Mutex::new(0));
 
+        let in_memory = Arc::new(Mem::new());
+
         ThreadPool {
             workers,
             sender,
             counter,
             cc,
             mem,
+            in_memory,
         }
     }
 
     pub fn execute<F>(&self, f: F)
     where
-        F: FnOnce(Arc<Mutex<Counter>>, Arc<RwLock<HashMap<String, String>>>) + Send + 'static,
+        F: FnOnce(Arc<Mutex<Counter>>, Arc<RwLock<HashMap<String, String>>> , Arc<Mem>) + Send + 'static,
     {
         let counter_cc = Arc::clone(&self.cc);
         counter_cc.lock().unwrap().add_count();
 
         let mem_cc = Arc::clone(&self.mem);
 
-        let job = Box::new(move || f(counter_cc, mem_cc));
+        let in_mem = Arc::clone(&self.in_memory);
+
+        let job = Box::new(move || f(counter_cc, mem_cc , in_mem));
 
         /*
                 let counter_clone = Arc::clone(&self.counter);
@@ -124,4 +131,9 @@ impl Worker {
 
         Worker { id, thread }
     }
+}
+
+
+pub fn server_start_crate() {
+    server::server_start();
 }

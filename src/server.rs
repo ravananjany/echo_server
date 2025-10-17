@@ -1,14 +1,20 @@
+
 use crate::command::Command;
-use crate::{Counter, ThreadPool, command};
+use crate::{Counter, ThreadPool, command };
 use futures::future::ok;
 use redis_protocol::resp2::encode::encode;
 use redis_protocol::resp2::types::{OwnedFrame, Resp2Frame};
 use std::collections::HashMap;
 use std::io;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{empty, BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::ops::Add;
 use std::sync::{Arc, Mutex, RwLock};
+use crate::mem_store::Mem;
+
+
+
+
 
 fn read_resp_line<R: Read>(reader: &mut BufReader<R>) -> io::Result<String> {
     //creating a buffer to read the data from stream
@@ -100,13 +106,15 @@ pub fn read_resp_request<T: std::io::Read>(stream: T) -> Result<Vec<String>, Str
     Ok(arguments)
 }
 
-pub fn handle_streams(mut stream: TcpStream, mem_store: Arc<RwLock<HashMap<String, String>>>) {
+pub fn handle_streams(mut stream: TcpStream, mem_store: Arc<RwLock<HashMap<String, String>>>, in_mem : Arc<Mem>) {
     let mut buf_reader = BufReader::new(&stream);
     let result = read_resp_request(&stream);
 
     let cmd = Command::from_input(result);
 
-    let resp = cmd.execute(mem_store);
+    let shared_mem = in_mem.as_ref();
+
+    let resp = cmd.execute(shared_mem);
 
     let mut res_bytes: Vec<u8> = vec![0; 4096];
 
@@ -281,19 +289,19 @@ pub fn server_start() -> Result<(), String> {
 
     let mem_store_og = Arc::new(RwLock::new(HashMap::<String, String>::new()));
 
-    // let memory_store = Arc::new(Mutex::new(crate::mem_store::Mem::new()));
+    let in_memory = Arc::new(Mem::new());
 
     let cc = Arc::new(Mutex::new(Counter::new()));
 
-    let pool = ThreadPool::new(2, Arc::clone(&cc), Arc::clone(&mem_store_og));
+    let pool = ThreadPool::new(2, Arc::clone(&cc), Arc::clone(&mem_store_og), in_memory);
 
     for stream in listener.incoming() {
         let stream = stream.unwrap();
 
-        pool.execute(move |_shared_cc, mem_store_cc| {
+        pool.execute(move |_shared_cc, mem_store_cc, in_memory_c| {
             dbg!("here it comes");
             //server::handle_connection(stream , shared_cc , mem_store_cc)
-            handle_streams(stream, mem_store_cc)
+            handle_streams(stream, mem_store_cc , in_memory_c)
         });
     }
     Ok(())

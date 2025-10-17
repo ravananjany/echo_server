@@ -1,9 +1,9 @@
-mod command;
-mod server;
+
+
 
 use std::collections::HashMap;
 
-use echo_server::{Counter, ThreadPool};
+use echo_server::{server_start_crate, Counter, ThreadPool};
 use std::io::{BufReader, prelude::*};
 use std::net::{TcpListener, TcpStream};
 use std::ops::Add;
@@ -16,7 +16,7 @@ fn main() {
 }
 
 fn server_start() {
-    server::server_start();
+    server_start_crate();
 }
 
 /*
