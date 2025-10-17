@@ -6,3 +6,4 @@ edition = "2024"
 [dependencies]
 futures = { version = "0.3.31", features = ["thread-pool"] }
 echo-server = "3.0.0"
+redis-protocol = "6.0.0"
